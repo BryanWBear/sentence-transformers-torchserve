@@ -7,6 +7,14 @@ from sentence_transformers import SentenceTransformer
 import scipy.spatial
 import json
 import zipfile
+from json import JSONEncoder
+import numpy as np
+
+class NumpyArrayEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return JSONEncoder.default(self, obj)
 
 class SematicSearch(object):
     """
@@ -44,32 +52,16 @@ class SematicSearch(object):
             inputs = data[0].get("body")
         inputs = inputs.decode('utf-8')
         inputs = json.loads(inputs)
-        corpus = inputs['corpus']
         queries = inputs['queries']
 
-        return corpus, queries
+        return queries
 
     def inference(self, data):
-        corpus_embeddings = self.embedder.encode(data[0])
-        query_embeddings = self.embedder.encode(data[1])
-	
-        closest_n = 5
-        inf_data = []
-        for query, query_embedding in zip(data[1], query_embeddings):
-            distances = scipy.spatial.distance.cdist([query_embedding], corpus_embeddings, "cosine")[0]
-
-            results = zip(range(len(distances)), distances)
-            results = sorted(results, key=lambda x: x[1])
-
-            qry_result = []
-            for idx, distance in results[0:closest_n]:
-                qry_result.append(data[0][idx].strip()+" (Score: %.4f)" % (1-distance))
-            inf_data.append({"Query":query, "Results":qry_result})
-
-        return [inf_data]
+        query_embeddings = self.embedder.encode(data)
+        return query_embeddings
 
     def postprocess(self, data):
-        return data
+        return [json.dumps(data, cls=NumpyArrayEncoder)]
 
 
 _service = SematicSearch()
